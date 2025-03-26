@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chaveamento de Torneio de Futebol</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        .input-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 0;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .bracket {
+            display: flex;
+            overflow-x: auto;
+            padding: 20px 0;
+        }
+        
+        .round {
+            display: flex;
+            flex-direction: column;
+            margin-right: 40px;
+            min-width: 200px;
+        }
+        
+        .round h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #555;
+        }
+        
+        .round.completed h3 {
+            color: #4CAF50;
+        }
+        
+        .round.current h3 {
+            font-weight: bold;
+            text-decoration: underline;
+        }
+        
+        .match {
+            position: relative;
+            margin-bottom: 40px;
+        }
+        
+        .team {
+            padding: 8px 12px;
+            margin: 4px 0;
+            background-color: #e9e9e9;
+            border-radius: 4px;
+            position: relative;
+            min-width: 150px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .team:hover {
+            background-color: #ddd;
+        }
+        
+        .team.selected {
+            background-color: #a5d6a7;
+            font-weight: bold;
+        }
+        
+        .team.empty {
+            color: #999;
+            background-color: #f0f0f0;
+            cursor: default;
+        }
+        
+        .team.empty:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .connector {
+            position: absolute;
+            right: -20px;
+            top: 50%;
+            width: 20px;
+            height: 2px;
+            background-color: #aaa;
+        }
+        
+        .connector::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: -14px;
+            width: 2px;
+            height: 30px;
+            background-color: #aaa;
+        }
+        
+        .match:nth-child(even) .connector::after {
+            top: -14px;
+        }
+        
+        .match:nth-child(odd) .connector::after {
+            top: 16px;
+        }
+        
+        #bracket-container {
+            margin-top: 20px;
+        }
+        
+        .round-controls {
+            text-align: center;
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .confirm-btn {
+            background-color: #2196F3;
+        }
+        
+        .confirm-btn:hover {
+            background-color: #0b7dda;
+        }
+        
+        .reset-btn {
+            background-color: #f44336;
+        }
+        
+        .reset-btn:hover {
+            background-color: #d32f2f;
+        }
+        
+        .status-message {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #e1f5fe;
+            color: #01579b;
+        }
+        
+        .champion {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #2E7D32;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #C8E6C9;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body onload="initializeTournament()">
+    <div class="container">
+        <h1>Chaveamento de Torneio de Futebol</h1>
+        
+        <div class="input-section">
+            <h2>Adicionar Times</h2>
+            <p>Insira os nomes dos times, um por linha:</p>
+            <textarea id="teams-input" placeholder="Time 1&#10;Time 2&#10;Time 3&#10;..."></textarea>
+            <button onclick="createNewTournament()">Gerar Chaveamento</button>
+        </div>
+        
+        <div id="status-message" class="status-message">
+            Selecione os vencedores da rodada atual
+        </div>
+        
+        <div id="champion-display" class="champion" style="display: none;"></div>
+        
+        <div id="bracket-container"></div>
+        
+        <div id="round-controls" class="round-controls" style="display: none;">
+            <button id="confirm-btn" class="confirm-btn" onclick="confirmWinners()" disabled>Confirmar Vencedores</button>
+            <button class="reset-btn" onclick="resetTournament()">Reiniciar Torneio</button>
+        </div>
+    </div>
+
+    <script>
+        class TournamentBracket {
+            constructor(containerId) {
+                this.container = document.getElementById(containerId);
+                this.statusElement = document.getElementById('status-message');
+                this.championElement = document.getElementById('champion-display');
+                this.controlsElement = document.getElementById('round-controls');
+                this.confirmBtn = document.getElementById('confirm-btn');
+                this.teams = [];
+                this.rounds = [];
+                this.currentRoundIndex = 0;
+                this.selectedWinners = {};
+            }
+
+            addTeams(teamNames) {
+                this.teams = teamNames.map(name => ({ name, active: true }));
+                this.generateBracket();
+            }
+
+            generateBracket() {
+                this.container.innerHTML = '';
+                this.rounds = [];
+                this.currentRoundIndex = 0;
+                this.selectedWinners = {};
+                this.championElement.style.display = 'none';
+
+                const teamCount = this.teams.length;
+                let roundCount = Math.ceil(Math.log2(teamCount));
+                if (roundCount < 1) roundCount = 1;
+
+
+                for (let i = 0; i < roundCount; i++) {
+                    const round = {
+                        name: i === roundCount - 1 ? 'Final' : 
+                              i === roundCount - 2 ? 'Semifinais' : 
+                              i === roundCount - 3 ? 'Quartas' : `Rodada ${i + 1}`,
+                        matches: [],
+                        completed: false
+                    };
+                    this.rounds.push(round);
+                }
+
+                // Preencher primeira rodada
+                const firstRound = this.rounds[0];
+                const firstRoundMatches = Math.pow(2, roundCount - 1);
+                
+                for (let i = 0; i < firstRoundMatches; i++) {
+                    const team1 = this.teams[i * 2] || { name: 'A definir', active: false };
+                    const team2 = this.teams[i * 2 + 1] || { name: 'A definir', active: false };
+                    firstRound.matches.push({
+                        team1,
+                        team2,
+                        winner: null
+                    });
+                }
+
+                // Preencher rodadas seguintes com espaços vazios
+                for (let i = 1; i < this.rounds.length; i++) {
+                    const prevRound = this.rounds[i - 1];
+                    const currentRound = this.rounds[i];
+                    
+                    for (let j = 0; j < Math.ceil(prevRound.matches.length / 2); j++) {
+                        currentRound.matches.push({
+                            team1: { name: '', active: false },
+                            team2: { name: '', active: false },
+                            winner: null
+                        });
+                    }
+                }
+
+                this.controlsElement.style.display = 'block';
+                this.updateStatus();
+                this.renderBracket();
+            }
+
+            renderBracket() {
+                this.container.innerHTML = '';
+                const bracketEl = document.createElement('div');
+                bracketEl.className = 'bracket';
+
+                this.rounds.forEach((round, roundIndex) => {
+                    const roundEl = document.createElement('div');
+                    roundEl.className = `round ${round.completed ? 'completed' : ''} ${roundIndex === this.currentRoundIndex ? 'current' : ''}`;
+
+                    const roundTitleEl = document.createElement('h3');
+                    roundTitleEl.textContent = round.name;
+                    roundEl.appendChild(roundTitleEl);
+
+                    const matchesEl = document.createElement('div');
+                    matchesEl.className = 'matches';
+
+                    round.matches.forEach((match, matchIndex) => {
+                        const matchEl = document.createElement('div');
+                        matchEl.className = 'match';
+
+                        // Times da partida
+                        const team1El = document.createElement('div');
+                        team1El.className = `team ${match.team1.active ? '' : 'empty'} ${this.selectedWinners[`${roundIndex}-${matchIndex}`] === match.team1.name ? 'selected' : ''}`;
+                        team1El.textContent = match.team1.name;
+                        if (roundIndex === this.currentRoundIndex && !round.completed && match.team1.active) {
+                            team1El.onclick = () => this.selectWinner(roundIndex, matchIndex, 'team1');
+                        }
+                        matchEl.appendChild(team1El);
+
+                        const team2El = document.createElement('div');
+                        team2El.className = `team ${match.team2.active ? '' : 'empty'} ${this.selectedWinners[`${roundIndex}-${matchIndex}`] === match.team2.name ? 'selected' : ''}`;
+                        team2El.textContent = match.team2.name;
+                        if (roundIndex === this.currentRoundIndex && !round.completed && match.team2.active) {
+                            team2El.onclick = () => this.selectWinner(roundIndex, matchIndex, 'team2');
+                        }
+                        matchEl.appendChild(team2El);
+
+                        // Conectores entre partidas
+                        if (roundIndex < this.rounds.length - 1) {
+                            const connectorEl = document.createElement('div');
+                            connectorEl.className = 'connector';
+                            matchEl.appendChild(connectorEl);
+                        }
+
+                        matchesEl.appendChild(matchEl);
+                    });
+
+                    roundEl.appendChild(matchesEl);
+                    bracketEl.appendChild(roundEl);
+                });
+
+                this.container.appendChild(bracketEl);
+            }
+
+            selectWinner(roundIndex, matchIndex, team) {
+                if (roundIndex !== this.currentRoundIndex || this.rounds[roundIndex].completed) {
+                    return;
+                }
+
+                const match = this.rounds[roundIndex].matches[matchIndex];
+                const selectedTeam = match[team];
+                
+                if (!selectedTeam.active || selectedTeam.name === '') return;
+                
+                // Armazena a seleção temporária
+                this.selectedWinners[`${roundIndex}-${matchIndex}`] = selectedTeam.name;
+                
+                // Verifica se todas as partidas têm vencedores selecionados
+                this.checkRoundSelections(roundIndex);
+                
+                // Atualiza a renderização
+                this.renderBracket();
+            }
+
+            checkRoundSelections(roundIndex) {
+                const round = this.rounds[roundIndex];
+                const allMatchesHaveSelection = round.matches.every((match, i) => {
+                    return this.selectedWinners[`${roundIndex}-${i}`] !== undefined;
+                });
+                
+                this.confirmBtn.disabled = !allMatchesHaveSelection;
+            }
+
+            confirmWinners() {
+                const currentRound = this.rounds[this.currentRoundIndex];
+                
+                // Aplica as seleções como vencedores oficiais
+                currentRound.matches.forEach((match, matchIndex) => {
+                    const winnerKey = `${this.currentRoundIndex}-${matchIndex}`;
+                    match.winner = this.selectedWinners[winnerKey];
+                });
+                
+                currentRound.completed = true;
+                
+                // Avança os vencedores para a próxima rodada se não for a final
+                if (this.currentRoundIndex < this.rounds.length - 1) {
+                    this.advanceWinnersToNextRound();
+                    this.currentRoundIndex++;
+                    this.selectedWinners = {};
+                    this.confirmBtn.disabled = true;
+                } else {
+                    // Torneio finalizado
+                    this.showChampion();
+                    this.controlsElement.style.display = 'none';
+                }
+                
+                this.updateStatus();
+                this.renderBracket();
+            }
+
+            advanceWinnersToNextRound() {
+                const currentRound = this.rounds[this.currentRoundIndex];
+                const nextRound = this.rounds[this.currentRoundIndex + 1];
+                
+                currentRound.matches.forEach((match, matchIndex) => {
+                    if (match.winner) {
+                        const nextMatchIndex = Math.floor(matchIndex / 2);
+                        const nextMatch = nextRound.matches[nextMatchIndex];
+                        
+                        const positionInNextMatch = matchIndex % 2 === 0 ? 'team1' : 'team2';
+                        
+                        nextMatch[positionInNextMatch] = {
+                            name: match.winner,
+                            active: true
+                        };
+                    }
+                });
+            }
+
+            showChampion() {
+                const finalMatch = this.rounds[this.rounds.length - 1].matches[0];
+                this.championElement.textContent = `🏆 Campeão: ${finalMatch.winner} 🏆`;
+                this.championElement.style.display = 'block';
+            }
+
+            updateStatus() {
+                if (this.rounds.length === 0) return;
+                
+                const currentRound = this.rounds[this.currentRoundIndex];
+                
+                if (currentRound.completed) {
+                    if (this.currentRoundIndex === this.rounds.length - 1) {
+                        this.statusElement.textContent = 'Torneio concluído!';
+                    } else {
+                        this.statusElement.textContent = `Selecione os vencedores da ${this.rounds[this.currentRoundIndex].name}`;
+                    }
+                } else {
+                    const selectedCount = Object.keys(this.selectedWinners).length;
+                    this.statusElement.textContent = `Selecione os vencedores da ${currentRound.name} (${selectedCount}/${currentRound.matches.length} selecionados)`;
+                }
+            }
+
+            resetTournament() {
+                this.generateBracket();
+            }
+        }
+
+        let tournamentBracket;
+
+        function initializeTournament() {
+            tournamentBracket = new TournamentBracket('bracket-container');
+            
+            const teams = [
+                'Time A', 'Time B', 'Time C', 'Time D', 
+                'Time E', 'Time F', 'Time G', 'Time H'
+            ];
+            
+            tournamentBracket.addTeams(teams);
+        }
+
+        function createNewTournament() {
+            const teamsInput = document.getElementById('teams-input').value;
+            const teamNames = teamsInput.split('\n').filter(name => name.trim() !== '');
+            
+            if (teamNames.length < 2) {
+                alert('Por favor, insira pelo menos 2 times para criar um torneio.');
+                return;
+            }
+            
+            tournamentBracket = new TournamentBracket('bracket-container');
+            tournamentBracket.addTeams(teamNames);
+        }
+
+        function confirmWinners() {
+            if (tournamentBracket) {
+                tournamentBracket.confirmWinners();
+            }
+        }
+
+        function resetTournament() {
+            if (tournamentBracket) {
+                tournamentBracket.resetTournament();
+            }
+        }
+    </script>
+</body>
+</html>
