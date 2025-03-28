@@ -33,14 +33,58 @@
             border-radius: 6px;
         }
         
-        textarea {
-            width: 100%;
-            height: 150px;
+        .team-input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        #team-input {
+            flex: 1;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            resize: vertical;
             font-family: inherit;
+        }
+        
+        .add-team-btn {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .add-team-btn:hover {
+            background-color: #0b7dda;
+        }
+        
+        .team-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+            background-color: white;
+        }
+        
+        .team-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .team-item:last-child {
+            border-bottom: none;
+        }
+        
+        .remove-team {
+            color: #f44336;
+            cursor: pointer;
         }
         
         button {
@@ -192,15 +236,34 @@
             color: #01579b;
         }
         
-        .champion {
+        .champion-container {
             text-align: center;
+            margin: 30px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .champion-title {
             font-size: 24px;
             font-weight: bold;
             color: #2E7D32;
-            margin: 20px 0;
-            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .champion-name {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1B5E20;
+            padding: 20px;
             background-color: #C8E6C9;
             border-radius: 8px;
+            display: inline-block;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .trophy {
+            font-size: 48px;
+            margin-bottom: 15px;
         }
         
         .options {
@@ -211,6 +274,52 @@
             margin-left: 8px;
             cursor: pointer;
         }
+        
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            opacity: 1;
+            animation: confetti-fall 3s ease-in forwards;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        .confetti:nth-child(5n) {
+            background-color: #f00;
+        }
+        .confetti:nth-child(5n+1) {
+            background-color: #0f0;
+        }
+        .confetti:nth-child(5n+2) {
+            background-color: #00f;
+        }
+        .confetti:nth-child(5n+3) {
+            background-color: #ff0;
+        }
+        .confetti:nth-child(5n+4) {
+            background-color: #f0f;
+        }
     </style>
 </head>
 <body onload="initializeTournament()">
@@ -219,22 +328,31 @@
         
         <div class="input-section">
             <h2>Adicionar Times</h2>
-            <p>Insira os nomes dos times, um por linha:</p>
-            <textarea id="teams-input" placeholder="Time 1&#10;TimeS 2&#10;Time 3&#10;..."></textarea>
+            
+            <div class="team-input-container">
+                <input type="text" id="team-input" placeholder="Nome do time" onkeypress="handleKeyPress(event)">
+                <button class="add-team-btn" onclick="addTeam()">Adicionar Time</button>
+            </div>
+            
+            <div class="team-list" id="team-list"></div>
             
             <div class="options">
                 <input type="checkbox" id="randomize-checkbox">
-                <label for="randomize-checkbox">Ordem aleatória</label>
+                <label for="randomize-checkbox">Aleatorizar ordem dos times</label>
             </div>
             
             <button onclick="createNewTournament()">Gerar Chaveamento</button>
         </div>
         
         <div id="status-message" class="status-message">
-            Selecione os vencedores da rodada atual
+            Adicione pelo menos 2 times para começar
         </div>
         
-        <div id="champion-display" class="champion" style="display: none;"></div>
+        <div id="champion-display" class="champion-container" style="display: none;">
+            <div class="trophy">🏆</div>
+            <div class="champion-title">CAMPEÃO:</div>
+            <div class="champion-name" id="champion-name"></div>
+        </div>
         
         <div id="bracket-container"></div>
         
@@ -244,18 +362,22 @@
         </div>
     </div>
 
+    <div id="confetti-container" class="confetti-container"></div>
+
     <script>
         class TournamentBracket {
             constructor(containerId) {
                 this.container = document.getElementById(containerId);
                 this.statusElement = document.getElementById('status-message');
                 this.championElement = document.getElementById('champion-display');
+                this.championNameElement = document.getElementById('champion-name');
                 this.controlsElement = document.getElementById('round-controls');
                 this.confirmBtn = document.getElementById('confirm-btn');
                 this.teams = [];
                 this.rounds = [];
                 this.currentRoundIndex = 0;
                 this.selectedWinners = {};
+                this.tournamentCompleted = false;
             }
 
             addTeams(teamNames, randomize = false) {
@@ -282,8 +404,15 @@
                 this.currentRoundIndex = 0;
                 this.selectedWinners = {};
                 this.championElement.style.display = 'none';
+                this.tournamentCompleted = false;
 
                 const teamCount = this.teams.length;
+                if (teamCount < 2) {
+                    this.statusElement.textContent = 'Adicione pelo menos 2 times para começar';
+                    this.controlsElement.style.display = 'none';
+                    return;
+                }
+
                 let roundCount = Math.ceil(Math.log2(teamCount));
                 if (roundCount < 1) roundCount = 1;
 
@@ -303,14 +432,19 @@
                 const firstRound = this.rounds[0];
                 const firstRoundMatches = Math.pow(2, roundCount - 1);
                 
-                for (let i = 0; i < firstRoundMatches; i++) {
-                    const team1 = this.teams[i * 2] || { name: 'A definir', active: false };
-                    const team2 = this.teams[i * 2 + 1] || { name: 'A definir', active: false };
-                    firstRound.matches.push({
-                        team1,
-                        team2,
-                        winner: null
-                    });
+                // Preenche apenas com os times existentes, sem adicionar "A definir"
+                for (let i = 0; i < Math.min(firstRoundMatches, Math.ceil(teamCount / 2)); i++) {
+                    const team1 = this.teams[i * 2] || { name: '', active: false };
+                    const team2 = this.teams[i * 2 + 1] || { name: '', active: false };
+                    
+                    // Só adiciona a partida se pelo menos um time existir
+                    if (team1.name !== '' || team2.name !== '') {
+                        firstRound.matches.push({
+                            team1,
+                            team2,
+                            winner: null
+                        });
+                    }
                 }
 
                 // Preencher rodadas seguintes com espaços vazios
@@ -349,22 +483,27 @@
                     matchesEl.className = 'matches';
 
                     round.matches.forEach((match, matchIndex) => {
+                        // Não renderiza partidas completamente vazias
+                        if (match.team1.name === '' && match.team2.name === '' && match.winner === null) {
+                            return;
+                        }
+
                         const matchEl = document.createElement('div');
                         matchEl.className = 'match';
 
                         // Times da partida
                         const team1El = document.createElement('div');
                         team1El.className = `team ${match.team1.active ? '' : 'empty'} ${this.selectedWinners[`${roundIndex}-${matchIndex}`] === match.team1.name ? 'selected' : ''}`;
-                        team1El.textContent = match.team1.name;
-                        if (roundIndex === this.currentRoundIndex && !round.completed && match.team1.active) {
+                        team1El.textContent = match.team1.name || ' ';
+                        if (roundIndex === this.currentRoundIndex && !round.completed && match.team1.active && match.team1.name) {
                             team1El.onclick = () => this.selectWinner(roundIndex, matchIndex, 'team1');
                         }
                         matchEl.appendChild(team1El);
 
                         const team2El = document.createElement('div');
                         team2El.className = `team ${match.team2.active ? '' : 'empty'} ${this.selectedWinners[`${roundIndex}-${matchIndex}`] === match.team2.name ? 'selected' : ''}`;
-                        team2El.textContent = match.team2.name;
-                        if (roundIndex === this.currentRoundIndex && !round.completed && match.team2.active) {
+                        team2El.textContent = match.team2.name || ' ';
+                        if (roundIndex === this.currentRoundIndex && !round.completed && match.team2.active && match.team2.name) {
                             team2El.onclick = () => this.selectWinner(roundIndex, matchIndex, 'team2');
                         }
                         matchEl.appendChild(team2El);
@@ -387,14 +526,14 @@
             }
 
             selectWinner(roundIndex, matchIndex, team) {
-                if (roundIndex !== this.currentRoundIndex || this.rounds[roundIndex].completed) {
+                if (roundIndex !== this.currentRoundIndex || this.rounds[roundIndex].completed || this.tournamentCompleted) {
                     return;
                 }
 
                 const match = this.rounds[roundIndex].matches[matchIndex];
                 const selectedTeam = match[team];
                 
-                if (!selectedTeam.active || selectedTeam.name === '') return;
+                if (!selectedTeam.active || !selectedTeam.name) return;
                 
                 // Armazena a seleção temporária
                 this.selectedWinners[`${roundIndex}-${matchIndex}`] = selectedTeam.name;
@@ -409,6 +548,8 @@
             checkRoundSelections(roundIndex) {
                 const round = this.rounds[roundIndex];
                 const allMatchesHaveSelection = round.matches.every((match, i) => {
+                    // Considera apenas partidas com pelo menos um time
+                    if (match.team1.name === '' && match.team2.name === '') return true;
                     return this.selectedWinners[`${roundIndex}-${i}`] !== undefined;
                 });
                 
@@ -421,7 +562,9 @@
                 // Aplica as seleções como vencedores oficiais
                 currentRound.matches.forEach((match, matchIndex) => {
                     const winnerKey = `${this.currentRoundIndex}-${matchIndex}`;
-                    match.winner = this.selectedWinners[winnerKey];
+                    if (this.selectedWinners[winnerKey]) {
+                        match.winner = this.selectedWinners[winnerKey];
+                    }
                 });
                 
                 currentRound.completed = true;
@@ -436,6 +579,7 @@
                     // Torneio finalizado
                     this.showChampion();
                     this.controlsElement.style.display = 'none';
+                    this.tournamentCompleted = true;
                 }
                 
                 this.updateStatus();
@@ -463,8 +607,39 @@
 
             showChampion() {
                 const finalMatch = this.rounds[this.rounds.length - 1].matches[0];
-                this.championElement.textContent = `🏆 Campeão: ${finalMatch.winner} 🏆`;
+                this.championNameElement.textContent = finalMatch.winner;
                 this.championElement.style.display = 'block';
+                this.createConfetti();
+            }
+
+            createConfetti() {
+                const container = document.getElementById('confetti-container');
+                container.innerHTML = ''; // Limpa confetes anteriores
+                
+                // Cria confetes apenas no canto superior direito
+                for (let i = 0; i < 100; i++) {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    
+                    // Posiciona no canto superior direito (últimos 20% da tela)
+                    const left = 80 + Math.random() * 20;
+                    
+                    // Configurações de animação
+                    confetti.style.left = left + 'vw';
+                    confetti.style.top = '-20px';
+                    confetti.style.width = (Math.random() * 10 + 8) + 'px';
+                    confetti.style.height = (Math.random() * 10 + 8) + 'px';
+                    confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+                    confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                    confetti.style.animationDelay = (Math.random() * 0.5) + 's';
+                    
+                    container.appendChild(confetti);
+                    
+                    // Remove o confete após a animação
+                    setTimeout(() => {
+                        confetti.remove();
+                    }, 5000);
+                }
             }
 
             updateStatus() {
@@ -480,7 +655,8 @@
                     }
                 } else {
                     const selectedCount = Object.keys(this.selectedWinners).length;
-                    this.statusElement.textContent = `Selecione os vencedores da ${currentRound.name} (${selectedCount}/${currentRound.matches.length} selecionados)`;
+                    const totalMatches = currentRound.matches.filter(m => m.team1.name || m.team2.name).length;
+                    this.statusElement.textContent = `Selecione os vencedores da ${currentRound.name} (${selectedCount}/${totalMatches} selecionados)`;
                 }
             }
 
@@ -490,30 +666,68 @@
         }
 
         let tournamentBracket;
+        let teamsList = [];
 
         function initializeTournament() {
             tournamentBracket = new TournamentBracket('bracket-container');
+            updateTeamList();
+        }
+
+        function addTeam() {
+            const teamInput = document.getElementById('team-input');
+            const teamName = teamInput.value.trim();
             
-            const teams = [
-                'Time A', 'Time B', 'Time C', 'Time D', 
-                'Time E', 'Time F', 'Time G', 'Time H'
-            ];
+            if (teamName) {
+                teamsList.push(teamName);
+                teamInput.value = '';
+                updateTeamList();
+                teamInput.focus(); // Mantém o foco no campo de input
+            }
+        }
+
+        function handleKeyPress(event) {
+            // Verifica se a tecla pressionada foi Enter (código 13)
+            if (event.keyCode === 13) {
+                addTeam();
+                event.preventDefault(); // Evita o comportamento padrão do Enter
+            }
+        }
+
+        function removeTeam(index) {
+            teamsList.splice(index, 1);
+            updateTeamList();
+        }
+
+        function updateTeamList() {
+            const teamListElement = document.getElementById('team-list');
+            teamListElement.innerHTML = '';
             
-            tournamentBracket.addTeams(teams);
+            if (teamsList.length === 0) {
+                teamListElement.innerHTML = '<div style="color: #999; text-align: center;">Nenhum time adicionado</div>';
+                return;
+            }
+            
+            teamsList.forEach((team, index) => {
+                const teamItem = document.createElement('div');
+                teamItem.className = 'team-item';
+                teamItem.innerHTML = `
+                    <span>${team}</span>
+                    <span class="remove-team" onclick="removeTeam(${index})">✕</span>
+                `;
+                teamListElement.appendChild(teamItem);
+            });
         }
 
         function createNewTournament() {
-            const teamsInput = document.getElementById('teams-input').value;
-            const teamNames = teamsInput.split('\n').filter(name => name.trim() !== '');
             const randomizeOrder = document.getElementById('randomize-checkbox').checked;
             
-            if (teamNames.length < 2) {
-                alert('Por favor, insira pelo menos 2 times para criar um torneio.');
+            if (teamsList.length < 2) {
+                alert('Por favor, adicione pelo menos 2 times para criar um torneio.');
                 return;
             }
             
             tournamentBracket = new TournamentBracket('bracket-container');
-            tournamentBracket.addTeams(teamNames, randomizeOrder);
+            tournamentBracket.addTeams(teamsList, randomizeOrder);
         }
 
         function confirmWinners() {
