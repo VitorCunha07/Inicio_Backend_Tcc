@@ -202,6 +202,15 @@
             background-color: #C8E6C9;
             border-radius: 8px;
         }
+        
+        .options {
+            margin: 15px 0;
+        }
+        
+        .options label {
+            margin-left: 8px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body onload="initializeTournament()">
@@ -212,6 +221,12 @@
             <h2>Adicionar Times</h2>
             <p>Insira os nomes dos times, um por linha:</p>
             <textarea id="teams-input" placeholder="Time 1&#10;Time 2&#10;Time 3&#10;..."></textarea>
+            
+            <div class="options">
+                <input type="checkbox" id="randomize-checkbox">
+                <label for="randomize-checkbox">Gerar chaveamento em ordem aleatória</label>
+            </div>
+            
             <button onclick="createNewTournament()">Gerar Chaveamento</button>
         </div>
         
@@ -243,9 +258,22 @@
                 this.selectedWinners = {};
             }
 
-            addTeams(teamNames) {
+            addTeams(teamNames, randomize = false) {
+                // Aleatoriza a ordem se necessário
+                if (randomize) {
+                    teamNames = this.shuffleArray([...teamNames]);
+                }
                 this.teams = teamNames.map(name => ({ name, active: true }));
                 this.generateBracket();
+            }
+
+            // Função para embaralhar array (Fisher-Yates)
+            shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
             }
 
             generateBracket() {
@@ -259,7 +287,7 @@
                 let roundCount = Math.ceil(Math.log2(teamCount));
                 if (roundCount < 1) roundCount = 1;
 
-
+                // Criar rodadas
                 for (let i = 0; i < roundCount; i++) {
                     const round = {
                         name: i === roundCount - 1 ? 'Final' : 
@@ -477,6 +505,7 @@
         function createNewTournament() {
             const teamsInput = document.getElementById('teams-input').value;
             const teamNames = teamsInput.split('\n').filter(name => name.trim() !== '');
+            const randomizeOrder = document.getElementById('randomize-checkbox').checked;
             
             if (teamNames.length < 2) {
                 alert('Por favor, insira pelo menos 2 times para criar um torneio.');
@@ -484,7 +513,7 @@
             }
             
             tournamentBracket = new TournamentBracket('bracket-container');
-            tournamentBracket.addTeams(teamNames);
+            tournamentBracket.addTeams(teamNames, randomizeOrder);
         }
 
         function confirmWinners() {
